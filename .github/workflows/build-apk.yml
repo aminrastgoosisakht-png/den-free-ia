@@ -1,4 +1,4 @@
-      - name: Build APK
+    - name: Build APK
         run: |
           cd project
           PROJECT_DIR=$(find . -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
