@@ -1,27 +1,74 @@
-    - name: Build APK
-        run: |
-          cd project
-          PROJECT_DIR=$(find . -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
-          cd "$PROJECT_DIR"
+name: Build DEN Android APK
 
-          python3 - <<'PY'
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android
+        uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;27.0.12077973"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Extract project
+        run: |
+          mkdir project
+          unzip -o DEN_CAD_Cleaner_0_7_0_GitHub_Upload.zip -d project
+
+      - name: Fix JVM targets
+        run: |
+          FILE=$(find project -path "*/app/build.gradle.kts" | head -1)
+          python3 - "$FILE" <<'PY'
+          import sys
           from pathlib import Path
 
-          p = Path("app/build.gradle.kts")
+          p = Path(sys.argv[1])
           s = p.read_text()
 
-          patch = """
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
-          """
+          if "compileOptions" not in s:
+              s = s.replace("android {", """android {
+                  compileOptions {
+                      sourceCompatibility = JavaVersion.VERSION_17
+                      targetCompatibility = JavaVersion.VERSION_17
+                  }
+                  kotlinOptions {
+                      jvmTarget = "17"
+                  }
+              """, 1)
 
-          s = s.replace("android {", "android {\n" + patch, 1)
           p.write_text(s)
           PY
 
+      - name: Build APK
+        run: |
+          SETTINGS=$(find project -name settings.gradle.kts -o -name settings.gradle | head -1)
+          cd "$(dirname "$SETTINGS")"
           gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DEN-APK
+          path: project/**/build/outputs/apk/debug/*.apk
