@@ -1,0 +1,35 @@
+name: Build DEN Android APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract project
+        run: |
+          mkdir project
+          unzip -o DEN_CAD_Cleaner_0_7_0_GitHub_Upload.zip -d project
+          find project -name settings.gradle -o -name settings.gradle.kts
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Build APK
+        run: |
+          cd project
+          PROJECT_DIR=$(find . -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs dirname)
+          cd "$PROJECT_DIR"
+          gradle --no-daemon assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DEN-APK
+          path: project/**/build/outputs/apk/debug/*.apk
